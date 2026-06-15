@@ -11,6 +11,7 @@ const BALL_SPEED_INIT = 5;
 const SPEED_MULT = 1.07;
 const MAX_SPEED_MULT = 2.8;
 const MAX_ANGLE = 65 * Math.PI / 180;
+const REWIND_SPEED_MULT = 5;
 
 const player = { x: MARGIN, y: H/2 - PH/2, w: PW, h: PH, score: 0 };
 const ai = { x: W - MARGIN - PW, y: H/2 - PH/2, w: PW, h: PH, score: 0 };
@@ -195,6 +196,33 @@ function triggerGlitch() {
   }, 250);
 }
 
+function startRewind(serveDir) {
+  state = 'rewind';
+  const angle = Math.atan2(ball.vy, ball.vx);
+  const rewindAngle = angle + Math.PI;
+  ball.vx = Math.cos(rewindAngle) * BALL_SPEED_INIT * REWIND_SPEED_MULT;
+  ball.vy = Math.sin(rewindAngle) * BALL_SPEED_INIT * REWIND_SPEED_MULT;
+  const screen = document.getElementById('crtScreen');
+  screen.classList.remove('shaking');
+  void screen.offsetWidth;
+  screen.classList.add('shaking');
+  const nc = document.getElementById('noiseCanvas');
+  nc.classList.add('burst');
+  setTimeout(() => {
+    nc.classList.remove('burst');
+  }, 100);
+  setTimeout(() => {
+    ball.x = W / 2;
+    ball.y = H / 2;
+    ball.speed = BALL_SPEED_INIT;
+    const serveAngle = (Math.random() - 0.5) * 0.8;
+    ball.vx = serveDir * ball.speed * Math.cos(serveAngle);
+    ball.vy = ball.speed * Math.sin(serveAngle);
+    screen.classList.remove('shaking');
+    state = 'play';
+  }, 300);
+}
+
 function update() {
   player.vy = 0;
   if (keys['w']) player.vy = -PADDLE_SPEED;
@@ -208,11 +236,12 @@ function update() {
     ai.y += Math.sign(diff) * Math.min(Math.abs(diff), AI_SPEED);
   }
   ai.y = Math.max(0, Math.min(H - ai.h, ai.y));
-  if (state !== 'play') return;
+  if (state !== 'play' && state !== 'rewind') return;
   ball.x += ball.vx;
   ball.y += ball.vy;
   if (ball.y - ball.r <= 0) { ball.vy = Math.abs(ball.vy); ball.y = ball.r; }
   if (ball.y + ball.r >= H) { ball.vy = -Math.abs(ball.vy); ball.y = H - ball.r; }
+  if (state !== 'play') return;
   if (ball.vx < 0 &&
       ball.x - ball.r <= player.x + player.w &&
       ball.x + ball.r >= player.x &&
@@ -233,13 +262,11 @@ function update() {
   }
   if (ball.x + ball.r < 0) {
     ai.score++;
-    state = 'score';
-    setTimeout(() => { resetBall(-1); state = 'play'; }, 800);
+    startRewind(-1);
   }
   if (ball.x - ball.r > W) {
     player.score++;
-    state = 'score';
-    setTimeout(() => { resetBall(1); state = 'play'; }, 800);
+    startRewind(1);
   }
 }
 
@@ -250,15 +277,15 @@ function render() {
   drawPaddle(ai, '#ff00ff', 'rgba(255,0,255,0.5)');
   drawBall();
   drawScores();
-  if (state === 'score') {
+  if (state === 'rewind') {
     ctx.save();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font = '22px "Press Start 2P", monospace';
+    ctx.font = '28px "Press Start 2P", monospace';
     ctx.shadowBlur = 20;
     ctx.shadowColor = '#ffffff';
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    ctx.fillText('SCORE!', W/2, H/2);
+    ctx.fillText('\u23ea', ball.x - 25, ball.y);
     ctx.restore();
   }
 }
