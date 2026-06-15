@@ -22,6 +22,12 @@ let state = 'start';
 let keys = {};
 let glitchTimeout = null;
 let gameWinner = null;
+let gameMode = null;
+
+function setNoiseState(cls) {
+  noiseCanvas.classList.remove('burst', 'gameover', 'menu');
+  if (cls) noiseCanvas.classList.add(cls);
+}
 
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
@@ -110,30 +116,40 @@ function drawScores() {
   const aStr = String(ai.score).padStart(2, '0');
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  ctx.font = '42px "Press Start 2P", monospace';
   const cx = W / 2;
+  const pLabel = gameMode === 2 ? 'P1' : 'Player';
+  const aLabel = gameMode === 2 ? 'P2' : 'AI';
+  ctx.font = '11px "Press Start 2P", monospace';
+  ctx.shadowBlur = 8;
+  ctx.shadowColor = '#00ffff';
+  ctx.fillStyle = '#00ffff';
+  ctx.fillText(pLabel, cx - 95, 8);
+  ctx.shadowColor = '#ff00ff';
+  ctx.fillStyle = '#ff00ff';
+  ctx.fillText(aLabel, cx + 95, 8);
+  ctx.font = '42px "Press Start 2P", monospace';
   ctx.shadowBlur = 0;
   ctx.fillStyle = 'rgba(255,0,0,0.25)';
-  ctx.fillText(pStr, cx - 95 + 2, 28);
+  ctx.fillText(pStr, cx - 95 + 2, 26);
   ctx.fillStyle = 'rgba(0,100,255,0.25)';
-  ctx.fillText(pStr, cx - 95 - 2, 28);
+  ctx.fillText(pStr, cx - 95 - 2, 26);
   ctx.shadowBlur = 18;
   ctx.shadowColor = '#00ffff';
   ctx.fillStyle = '#00ffff';
-  ctx.fillText(pStr, cx - 95, 28);
+  ctx.fillText(pStr, cx - 95, 26);
   ctx.shadowBlur = 0;
   ctx.fillStyle = 'rgba(255,0,0,0.25)';
-  ctx.fillText(aStr, cx + 95 + 2, 28);
+  ctx.fillText(aStr, cx + 95 + 2, 26);
   ctx.fillStyle = 'rgba(0,100,255,0.25)';
-  ctx.fillText(aStr, cx + 95 - 2, 28);
+  ctx.fillText(aStr, cx + 95 - 2, 26);
   ctx.shadowBlur = 18;
   ctx.shadowColor = '#ff00ff';
   ctx.fillStyle = '#ff00ff';
-  ctx.fillText(aStr, cx + 95, 28);
+  ctx.fillText(aStr, cx + 95, 26);
   ctx.shadowBlur = 0;
   ctx.fillStyle = 'rgba(255,255,255,0.2)';
   ctx.font = '32px "Press Start 2P", monospace';
-  ctx.fillText(':', cx, 30);
+  ctx.fillText(':', cx, 28);
   ctx.restore();
 }
 
@@ -142,24 +158,30 @@ function drawStartScreen() {
   ctx.save();
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = '76px "Press Start 2P", monospace';
-  const cx = W/2, cy = H/2 - 50;
+  const cx = W/2, cy = H/2;
+  ctx.font = '52px "Press Start 2P", monospace';
   ctx.shadowBlur = 0;
   ctx.fillStyle = 'rgba(255,0,0,0.3)';
-  ctx.fillText('P0NG', cx + 4, cy);
+  ctx.fillText('VHS PONG', cx + 4, cy - 110);
   ctx.fillStyle = 'rgba(0,100,255,0.3)';
-  ctx.fillText('P0NG', cx - 4, cy);
+  ctx.fillText('VHS PONG', cx - 4, cy - 110);
   ctx.shadowBlur = 35;
   ctx.shadowColor = '#ff66ff';
   ctx.fillStyle = '#fff0f5';
-  ctx.fillText('P0NG', cx, cy);
+  ctx.fillText('VHS PONG', cx, cy - 110);
+  ctx.shadowBlur = 18;
+  ctx.shadowColor = 'rgba(0,255,255,0.5)';
+  ctx.fillStyle = '#00ffff';
+  ctx.font = '18px "Press Start 2P", monospace';
+  ctx.fillText('Press 1: Player vs AI', cx, cy - 20);
+  ctx.shadowBlur = 18;
+  ctx.shadowColor = 'rgba(255,0,255,0.5)';
+  ctx.fillStyle = '#ff00ff';
+  ctx.fillText('Press 2: Player vs Friend', cx, cy + 30);
   ctx.shadowBlur = 0;
-  ctx.font = '16px "Press Start 2P", monospace';
-  ctx.fillStyle = `rgba(255,255,255,${0.3 + 0.5 * Math.abs(Math.sin(Date.now() / 400))})`;
-  ctx.fillText('PRESS ANY KEY', cx, cy + 70);
-  ctx.fillStyle = 'rgba(255,255,255,0.15)';
-  ctx.font = '11px "Press Start 2P", monospace';
-  ctx.fillText('W / S TO MOVE', cx, cy + 110);
+  ctx.font = '14px "Press Start 2P", monospace';
+  ctx.fillStyle = `rgba(255,255,255,${0.3 + 0.4 * Math.abs(Math.sin(Date.now() / 400))})`;
+  ctx.fillText('SELECT MODE', cx, cy + 100);
   ctx.restore();
 }
 
@@ -172,10 +194,20 @@ function drawGameOverScreen() {
   ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
   ctx.fillRect(0, 0, W, H);
   const cx = W / 2, cy = H / 2;
-  const isWin = gameWinner === 'player';
-  const title = isWin ? 'YOU WIN!' : 'YOU LOSE!';
-  const color = isWin ? '#00ffff' : '#ff00ff';
-  const glow = isWin ? 'rgba(0,255,255,0.5)' : 'rgba(255,0,255,0.5)';
+  let title, color, glow, scoreLine;
+  if (gameMode === 2) {
+    const p1Wins = gameWinner === 'player';
+    title = p1Wins ? 'PLAYER 1 WINS!' : 'PLAYER 2 WINS!';
+    color = p1Wins ? '#00ffff' : '#ff00ff';
+    glow = p1Wins ? 'rgba(0,255,255,0.5)' : 'rgba(255,0,255,0.5)';
+    scoreLine = 'P1 ' + player.score + ' - ' + ai.score + ' P2';
+  } else {
+    const isWin = gameWinner === 'player';
+    title = isWin ? 'YOU WIN!' : 'YOU LOSE!';
+    color = isWin ? '#00ffff' : '#ff00ff';
+    glow = isWin ? 'rgba(0,255,255,0.5)' : 'rgba(255,0,255,0.5)';
+    scoreLine = 'Player ' + player.score + ' - ' + ai.score + ' AI';
+  }
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.font = '56px "Press Start 2P", monospace';
@@ -191,7 +223,7 @@ function drawGameOverScreen() {
   ctx.shadowBlur = 0;
   ctx.font = '20px "Press Start 2P", monospace';
   ctx.fillStyle = 'rgba(255,255,255,0.7)';
-  ctx.fillText('Player ' + player.score + ' - ' + ai.score + ' AI', cx, cy + 30);
+  ctx.fillText(scoreLine, cx, cy + 30);
   ctx.font = '14px "Press Start 2P", monospace';
   ctx.fillStyle = 'rgba(255,255,255,' + (0.3 + 0.4 * Math.abs(Math.sin(Date.now() / 400))) + ')';
   ctx.fillText('PRESS R TO RESTART', cx, cy + 90);
@@ -267,10 +299,17 @@ function update() {
   if (state === 'start' || state === 'gameover') return;
   player.y += player.vy;
   player.y = Math.max(0, Math.min(H - player.h, player.y));
-  const targetY = ball.y - ai.h / 2;
-  const diff = targetY - ai.y;
-  if (Math.abs(diff) > 6) {
-    ai.y += Math.sign(diff) * Math.min(Math.abs(diff), AI_SPEED);
+  if (gameMode === 1) {
+    const targetY = ball.y - ai.h / 2;
+    const diff = targetY - ai.y;
+    if (Math.abs(diff) > 6) {
+      ai.y += Math.sign(diff) * Math.min(Math.abs(diff), AI_SPEED);
+    }
+  } else {
+    let vy = 0;
+    if (keys['arrowup']) vy = -PADDLE_SPEED;
+    if (keys['arrowdown']) vy = PADDLE_SPEED;
+    ai.y += vy;
   }
   ai.y = Math.max(0, Math.min(H - ai.h, ai.y));
   if (state !== 'play' && state !== 'rewind') return;
@@ -302,7 +341,7 @@ function update() {
     if (ai.score >= WIN_SCORE) {
       gameWinner = 'ai';
       state = 'gameover';
-      noiseCanvas.classList.add('gameover');
+      setNoiseState('gameover');
     } else {
       startRewind(-1);
     }
@@ -312,7 +351,7 @@ function update() {
     if (player.score >= WIN_SCORE) {
       gameWinner = 'player';
       state = 'gameover';
-      noiseCanvas.classList.add('gameover');
+      setNoiseState('gameover');
     } else {
       startRewind(1);
     }
@@ -356,22 +395,33 @@ function generateNoise() {
 
 generateNoise();
 setInterval(generateNoise, 80);
+setNoiseState('menu');
 
 document.addEventListener('keydown', (e) => {
   const k = e.key.toLowerCase();
   keys[k] = true;
+  if (state === 'start') {
+    if (k === '1') {
+      gameMode = 1;
+      setNoiseState(null);
+      state = 'play';
+      resetBall(Math.random() > 0.5 ? 1 : -1);
+    } else if (k === '2') {
+      gameMode = 2;
+      setNoiseState(null);
+      state = 'play';
+      resetBall(Math.random() > 0.5 ? 1 : -1);
+    }
+  }
   if (state === 'gameover' && k === 'r') {
     player.score = 0;
     ai.score = 0;
     gameWinner = null;
-    noiseCanvas.classList.remove('gameover');
-    resetBall(Math.random() > 0.5 ? 1 : -1);
-    state = 'play';
-    if (k === 'w' || k === 's') e.preventDefault();
-    return;
+    gameMode = null;
+    setNoiseState('menu');
+    state = 'start';
   }
-  if (state === 'start') { state = 'play'; resetBall(Math.random() > 0.5 ? 1 : -1); }
-  if (k === 'w' || k === 's') e.preventDefault();
+  if (k === 'w' || k === 's' || k === 'arrowup' || k === 'arrowdown') e.preventDefault();
 });
 
 document.addEventListener('keyup', (e) => {
