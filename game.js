@@ -14,6 +14,22 @@ const MAX_ANGLE = 65 * Math.PI / 180;
 const REWIND_SPEED_MULT = 5;
 const WIN_SCORE = 5;
 
+const ALL_MODS = [
+  { id: 'bigBall', name: 'Big Ball', color: '#ffcc00' },
+  { id: 'smallPaddles', name: 'Small Paddles', color: '#ff8800' },
+  { id: 'speedUp', name: 'Speed Up', color: '#ff4444' },
+  { id: 'fogZone', name: 'Fog Zone', color: '#88ccff' },
+  { id: 'reverseControls', name: 'Reverse Controls', color: '#44ff44' },
+  { id: 'multiBall', name: 'Multi-Ball', color: '#ff66aa' },
+  { id: 'stickyPaddle', name: 'Sticky Paddle', color: '#aaff44' },
+  { id: 'strongRewind', name: 'Strong Rewind', color: '#ff44ff' },
+];
+let activeMods = [];
+let curSpeedMult = SPEED_MULT;
+let curMaxSpeedMult = MAX_SPEED_MULT;
+let ball2 = null;
+let sticky = { active: false, paddle: null, timer: 0, dir: 0 };
+
 const player = { x: MARGIN, y: H/2 - PH/2, w: PW, h: PH, score: 0 };
 const ai = { x: W - MARGIN - PW, y: H/2 - PH/2, w: PW, h: PH, score: 0 };
 const ball = { x: W/2, y: H/2, r: BR, vx: 0, vy: 0, speed: BALL_SPEED_INIT };
@@ -27,6 +43,44 @@ let gameMode = null;
 function setNoiseState(cls) {
   noiseCanvas.classList.remove('burst', 'gameover', 'menu');
   if (cls) noiseCanvas.classList.add(cls);
+}
+
+function rollModifiers() {
+  const count = 1 + Math.floor(Math.random() * 3);
+  const shuffled = [...ALL_MODS].sort(() => Math.random() - 0.5);
+  activeMods = shuffled.slice(0, count).map(m => m.id);
+}
+
+function applyModifiers() {
+  if (activeMods.includes('bigBall')) ball.r = BR * 2;
+  else ball.r = BR;
+  if (activeMods.includes('smallPaddles')) {
+    player.h = PH * 0.6;
+    ai.h = PH * 0.6;
+  } else {
+    player.h = PH;
+    ai.h = PH;
+  }
+  if (activeMods.includes('speedUp')) {
+    curSpeedMult = 1.15;
+    curMaxSpeedMult = 4;
+  } else {
+    curSpeedMult = SPEED_MULT;
+    curMaxSpeedMult = MAX_SPEED_MULT;
+  }
+  ball2 = null;
+  sticky.active = false;
+}
+
+function resetModifiers() {
+  ball.r = BR;
+  player.h = PH;
+  ai.h = PH;
+  curSpeedMult = SPEED_MULT;
+  curMaxSpeedMult = MAX_SPEED_MULT;
+  ball2 = null;
+  sticky.active = false;
+  activeMods = [];
 }
 
 function roundRect(ctx, x, y, w, h, r) {
@@ -58,32 +112,33 @@ function drawPaddle(p, color, glowColor) {
   ctx.restore();
 }
 
-function drawBall() {
+function drawBall(b) {
+  const bRef = b || ball;
   ctx.save();
   ctx.shadowBlur = 20;
   ctx.shadowColor = '#ff0066';
   ctx.globalAlpha = 0.35;
   ctx.fillStyle = '#ff0040';
   ctx.beginPath();
-  ctx.arc(ball.x + 3, ball.y, ball.r, 0, Math.PI * 2);
+  ctx.arc(bRef.x + 3, bRef.y, bRef.r, 0, Math.PI * 2);
   ctx.fill();
   ctx.shadowColor = '#0066ff';
   ctx.fillStyle = '#0040ff';
   ctx.beginPath();
-  ctx.arc(ball.x - 3, ball.y, ball.r, 0, Math.PI * 2);
+  ctx.arc(bRef.x - 3, bRef.y, bRef.r, 0, Math.PI * 2);
   ctx.fill();
   ctx.globalAlpha = 1;
   ctx.shadowBlur = 30;
   ctx.shadowColor = '#ff88cc';
   ctx.fillStyle = '#fff0f5';
   ctx.beginPath();
-  ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+  ctx.arc(bRef.x, bRef.y, bRef.r, 0, Math.PI * 2);
   ctx.fill();
   ctx.shadowBlur = 15;
   ctx.shadowColor = '#ffffff';
   ctx.globalAlpha = 0.4;
   ctx.beginPath();
-  ctx.arc(ball.x - 2, ball.y - 2, ball.r * 0.5, 0, Math.PI * 2);
+  ctx.arc(bRef.x - 2, bRef.y - 2, bRef.r * 0.5, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 }
@@ -108,6 +163,10 @@ function drawBg() {
   ctx.strokeStyle = 'rgba(255,255,255,0.04)';
   ctx.lineWidth = 2;
   ctx.stroke();
+  if (activeMods.includes('fogZone')) {
+    ctx.fillStyle = 'rgba(136, 204, 255, 0.06)';
+    ctx.fillRect(0, 0, W, H);
+  }
 }
 
 function drawScores() {
@@ -183,6 +242,22 @@ function drawStartScreen() {
   ctx.fillStyle = `rgba(255,255,255,${0.3 + 0.4 * Math.abs(Math.sin(Date.now() / 400))})`;
   ctx.fillText('SELECT MODE', cx, cy + 100);
   ctx.restore();
+  if (activeMods.length > 0) {
+    ctx.save();
+    ctx.font = '10px "Press Start 2P", monospace';
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#8888ff';
+    ctx.fillStyle = '#aaaaff';
+    ctx.textAlign = 'center';
+    ctx.fillText('MODIFIERS:', cx, cy + 142);
+    const mods = ALL_MODS.filter(m => activeMods.includes(m.id));
+    mods.forEach((m, i) => {
+      ctx.fillStyle = m.color;
+      ctx.shadowColor = m.color;
+      ctx.fillText(m.name, cx, cy + 158 + i * 18);
+    });
+    ctx.restore();
+  }
 }
 
 function drawGameOverScreen() {
@@ -236,9 +311,17 @@ function handlePaddleHit(paddle) {
   const clamped = Math.max(-1, Math.min(1, relHit));
   const angle = clamped * MAX_ANGLE;
   const dir = paddle === player ? 1 : -1;
-  ball.speed = Math.min(ball.speed * SPEED_MULT, BALL_SPEED_INIT * MAX_SPEED_MULT);
+  ball.speed = Math.min(ball.speed * curSpeedMult, BALL_SPEED_INIT * curMaxSpeedMult);
   ball.vx = dir * ball.speed * Math.cos(angle);
   ball.vy = ball.speed * Math.sin(angle);
+  if (activeMods.includes('stickyPaddle')) {
+    sticky.active = true;
+    sticky.paddle = paddle;
+    sticky.timer = 15;
+    sticky.dir = dir;
+    ball.vx = 0;
+    ball.vy = 0;
+  }
 }
 
 function resetBall(direction) {
@@ -269,8 +352,10 @@ function startRewind(serveDir) {
   state = 'rewind';
   const angle = Math.atan2(ball.vy, ball.vx);
   const rewindAngle = angle + Math.PI;
-  ball.vx = Math.cos(rewindAngle) * BALL_SPEED_INIT * REWIND_SPEED_MULT;
-  ball.vy = Math.sin(rewindAngle) * BALL_SPEED_INIT * REWIND_SPEED_MULT;
+  const rewindMult = activeMods.includes('strongRewind') ? REWIND_SPEED_MULT * 1.6 : REWIND_SPEED_MULT;
+  const rewindDur = activeMods.includes('strongRewind') ? 400 : 300;
+  ball.vx = Math.cos(rewindAngle) * BALL_SPEED_INIT * rewindMult;
+  ball.vy = Math.sin(rewindAngle) * BALL_SPEED_INIT * rewindMult;
   const screen = document.getElementById('crtScreen');
   screen.classList.remove('shaking');
   void screen.offsetWidth;
@@ -289,13 +374,24 @@ function startRewind(serveDir) {
     ball.vy = ball.speed * Math.sin(serveAngle);
     screen.classList.remove('shaking');
     state = 'play';
-  }, 300);
+    if (activeMods.includes('multiBall')) {
+      ball2 = {
+        x: W / 2 + (Math.random() - 0.5) * 200,
+        y: 50 + Math.random() * (H - 100),
+        r: BR,
+        vx: (Math.random() > 0.5 ? 1 : -1) * BALL_SPEED_INIT * 0.8,
+        vy: (Math.random() - 0.5) * BALL_SPEED_INIT * 0.8,
+        speed: BALL_SPEED_INIT * 0.8,
+      };
+    }
+  }, rewindDur);
 }
 
 function update() {
   player.vy = 0;
-  if (keys['w']) player.vy = -PADDLE_SPEED;
-  if (keys['s']) player.vy = PADDLE_SPEED;
+  const reverse = activeMods.includes('reverseControls');
+  if (keys['w']) player.vy = (reverse ? 1 : -1) * PADDLE_SPEED;
+  if (keys['s']) player.vy = (reverse ? -1 : 1) * PADDLE_SPEED;
   if (state === 'start' || state === 'gameover') return;
   player.y += player.vy;
   player.y = Math.max(0, Math.min(H - player.h, player.y));
@@ -312,11 +408,32 @@ function update() {
     ai.y += vy;
   }
   ai.y = Math.max(0, Math.min(H - ai.h, ai.y));
+  if (sticky.active) {
+    sticky.timer--;
+    if (sticky.timer <= 0) {
+      const angle = (Math.random() - 0.5) * 0.8;
+      ball.speed = BALL_SPEED_INIT;
+      ball.vx = sticky.dir * ball.speed * Math.cos(angle);
+      ball.vy = ball.speed * Math.sin(angle);
+      sticky.active = false;
+      sticky.paddle = null;
+    } else {
+      ball.x = sticky.paddle.x + (sticky.dir > 0 ? sticky.paddle.w + ball.r : -ball.r);
+      ball.y = sticky.paddle.y + sticky.paddle.h / 2;
+    }
+  }
   if (state !== 'play' && state !== 'rewind') return;
   ball.x += ball.vx;
   ball.y += ball.vy;
   if (ball.y - ball.r <= 0) { ball.vy = Math.abs(ball.vy); ball.y = ball.r; }
   if (ball.y + ball.r >= H) { ball.vy = -Math.abs(ball.vy); ball.y = H - ball.r; }
+  if (ball2) {
+    ball2.x += ball2.vx;
+    ball2.y += ball2.vy;
+    if (ball2.y - ball2.r <= 0) { ball2.vy = Math.abs(ball2.vy); ball2.y = ball2.r; }
+    if (ball2.y + ball2.r >= H) { ball2.vy = -Math.abs(ball2.vy); ball2.y = H - ball2.r; }
+    if (ball2.x + ball2.r < 0 || ball2.x - ball2.r > W) ball2 = null;
+  }
   if (state !== 'play') return;
   if (ball.vx < 0 &&
       ball.x - ball.r <= player.x + player.w &&
@@ -365,6 +482,7 @@ function render() {
   drawPaddle(player, '#00ffff', 'rgba(0,255,255,0.5)');
   drawPaddle(ai, '#ff00ff', 'rgba(255,0,255,0.5)');
   drawBall();
+  if (ball2) drawBall(ball2);
   drawScores();
   if (state === 'rewind') {
     ctx.save();
@@ -403,11 +521,13 @@ document.addEventListener('keydown', (e) => {
   if (state === 'start') {
     if (k === '1') {
       gameMode = 1;
+      applyModifiers();
       setNoiseState(null);
       state = 'play';
       resetBall(Math.random() > 0.5 ? 1 : -1);
     } else if (k === '2') {
       gameMode = 2;
+      applyModifiers();
       setNoiseState(null);
       state = 'play';
       resetBall(Math.random() > 0.5 ? 1 : -1);
@@ -418,6 +538,8 @@ document.addEventListener('keydown', (e) => {
     ai.score = 0;
     gameWinner = null;
     gameMode = null;
+    resetModifiers();
+    rollModifiers();
     setNoiseState('menu');
     state = 'start';
   }
@@ -434,4 +556,5 @@ function loop() {
   requestAnimationFrame(loop);
 }
 
+rollModifiers();
 loop();
