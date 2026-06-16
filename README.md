@@ -93,6 +93,6 @@ See the `modifiers` or settings section in `game.js` to enable/disable or add yo
 
 ## 🙏 Acknowledgments
 
-- Classic Pong and various VHS aesthetics for inspiration [web:19][web:41].
-- OpenCode Desktop [web:22].
+- Classic Pong and various VHS aesthetics for inspiration.
+- OpenCode Desktop.
 - Perplexity Ai 
