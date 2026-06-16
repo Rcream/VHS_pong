@@ -68,8 +68,31 @@ function applyModifiers() {
     curSpeedMult = SPEED_MULT;
     curMaxSpeedMult = MAX_SPEED_MULT;
   }
+  setFogZoneEnabled(activeMods.includes('fogZone'));
   ball2 = null;
   sticky.active = false;
+}
+
+function setFogZoneEnabled(enabled) {
+  const fog = document.getElementById('fog-zone');
+  fog.classList.toggle('active', enabled);
+  if (!enabled) fog.style.opacity = '';
+}
+
+function isBallInFogZone(bRef) {
+  const fogW = W * 0.8, fogH = H * 1;
+  const fogX = (W - fogW) / 2, fogY = (H - fogH) / 2;
+  return bRef.x + bRef.r > fogX && bRef.x - bRef.r < fogX + fogW &&
+         bRef.y + bRef.r > fogY && bRef.y - bRef.r < fogY + fogH;
+}
+
+function updateFogIntensity() {
+  if (!activeMods.includes('fogZone') || state !== 'play') return;
+  const fog = document.getElementById('fog-zone');
+  const speedRatio = (ball.speed - BALL_SPEED_INIT) / (BALL_SPEED_INIT * curMaxSpeedMult - BALL_SPEED_INIT);
+  let opacity = 0.85 + Math.max(0, Math.min(1, speedRatio)) * 0.15;
+  if (Math.abs(player.score - ai.score) <= 1) opacity += 0.1;
+  fog.style.opacity = Math.min(1, opacity);
 }
 
 function resetModifiers() {
@@ -80,6 +103,7 @@ function resetModifiers() {
   curMaxSpeedMult = MAX_SPEED_MULT;
   ball2 = null;
   sticky.active = false;
+  setFogZoneEnabled(false);
   activeMods = [];
 }
 
@@ -114,18 +138,20 @@ function drawPaddle(p, color, glowColor) {
 
 function drawBall(b) {
   const bRef = b || ball;
+  const inFog = activeMods.includes('fogZone') && isBallInFogZone(bRef);
+  const caOff = inFog ? 6 : 3;
   ctx.save();
   ctx.shadowBlur = 20;
   ctx.shadowColor = '#ff0066';
   ctx.globalAlpha = 0.35;
   ctx.fillStyle = '#ff0040';
   ctx.beginPath();
-  ctx.arc(bRef.x + 3, bRef.y, bRef.r, 0, Math.PI * 2);
+  ctx.arc(bRef.x + caOff, bRef.y, bRef.r, 0, Math.PI * 2);
   ctx.fill();
   ctx.shadowColor = '#0066ff';
   ctx.fillStyle = '#0040ff';
   ctx.beginPath();
-  ctx.arc(bRef.x - 3, bRef.y, bRef.r, 0, Math.PI * 2);
+  ctx.arc(bRef.x - caOff, bRef.y, bRef.r, 0, Math.PI * 2);
   ctx.fill();
   ctx.globalAlpha = 1;
   ctx.shadowBlur = 30;
@@ -163,10 +189,6 @@ function drawBg() {
   ctx.strokeStyle = 'rgba(255,255,255,0.04)';
   ctx.lineWidth = 2;
   ctx.stroke();
-  if (activeMods.includes('fogZone')) {
-    ctx.fillStyle = 'rgba(136, 204, 255, 0.06)';
-    ctx.fillRect(0, 0, W, H);
-  }
 }
 
 function drawScores() {
@@ -388,6 +410,7 @@ function startRewind(serveDir) {
 }
 
 function update() {
+  updateFogIntensity();
   player.vy = 0;
   const reverse = activeMods.includes('reverseControls');
   if (keys['w']) player.vy = (reverse ? 1 : -1) * PADDLE_SPEED;
